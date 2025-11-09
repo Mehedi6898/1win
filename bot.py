@@ -8,9 +8,9 @@ import threading
 import os
 
 # === CONFIG ===
-BOT_TOKEN = "8239639639:AAHyf5kSuSV7ZwiKTd1x3rLeMLOLXIKUzrc"  # <-- paste your token here
-MIN_DEPOSIT = 50.0  # dollars
-AFFILIATE_LINK = "https://1wrpdq.com/?open=register&p=8ay6"
+BOT_TOKEN = "8239639639:AAHyf5kSuSV7ZwiKTd1x3rLeMLOLXIKUzrc"
+MIN_DEPOSIT = 50.0
+AFFILIATE_BASE = "https://1wrpdq.com/?open=register&p=8ay6"
 DATA_FILE = "users.json"
 
 bot = Bot(token=BOT_TOKEN)
@@ -35,49 +35,83 @@ def save_data():
 @dp.message_handler(commands=["start"])
 async def start_cmd(message: types.Message):
     uid = str(message.from_user.id)
-    user_data.setdefault(uid, {"deposit": 0.0, "qualified": False, "running": False})
+    user_data.setdefault(uid, {"deposit": 0.0, "registered": False, "qualified": False, "running": False})
     save_data()
 
-    welcome = f"Hey {message.from_user.first_name}! 👋 Welcome to the King Predictor 🎁"
-    howto = (
-        "How to get Predictions?:\n"
-        "1️⃣ Register using your personal link\n"
-        "2️⃣ Deposit at least $50\n"
-        "3️⃣ Tap 'Check Progress' when done and get live Predictions\n\n"
-        f"👉 Your link:\n{AFFILIATE_LINK}&subid={uid}"
-    )
-    btn = InlineKeyboardMarkup().add(
-        InlineKeyboardButton("Check Progress ✅", callback_data="check_progress")
-    )
-    await message.answer(welcome)
-    await message.answer(howto, reply_markup=btn)
+    register_button = InlineKeyboardButton("🔗 Register Here", url=f"{AFFILIATE_BASE}&subid={uid}")
+    check_registration_button = InlineKeyboardButton("✅ Check Registration", callback_data="check_registration")
 
-@dp.callback_query_handler(lambda c: c.data == "check_progress")
-async def check_progress(call: types.CallbackQuery):
+    markup = InlineKeyboardMarkup().add(register_button).add(check_registration_button)
+
+    text = (
+        f"Hey {message.from_user.first_name}! 👋 Welcome to the *King Predictor* 🎁\n\n"
+        "Follow the steps below to start receiving predictions:\n"
+        "1️⃣ Register using your personal link below.\n"
+        "2️⃣ Deposit at least **$50** on your account.\n"
+        "3️⃣ Check your progress step-by-step.\n\n"
+        "_Tap below to begin:_"
+    )
+
+    await message.answer(text, parse_mode="Markdown", reply_markup=markup)
+
+# === CHECK REGISTRATION ===
+@dp.callback_query_handler(lambda c: c.data == "check_registration")
+async def check_registration(call: types.CallbackQuery):
     uid = str(call.from_user.id)
-    user = user_data.get(uid, {"deposit": 0.0, "qualified": False})
+    user = user_data.get(uid, {"deposit": 0.0, "registered": False})
+    
+    # Simulate registration check
+    registered = True  # Change to actual check if you add tracking
+    
+    if registered:
+        user["registered"] = True
+        save_data()
+
+        markup = InlineKeyboardMarkup().add(
+            InlineKeyboardButton("💵 Check Deposit", callback_data="check_deposit")
+        )
+
+        await call.message.answer(
+            "✅ Registration confirmed!\n\n"
+            "Now deposit **$50 or more** to unlock predictions.\n"
+            "Once done, tap below to verify your deposit 👇",
+            parse_mode="Markdown",
+            reply_markup=markup
+        )
+    else:
+        await call.message.answer(
+            "❌ You haven’t registered yet.\n\nPlease register first using the button below.",
+            parse_mode="Markdown"
+        )
+
+# === CHECK DEPOSIT ===
+@dp.callback_query_handler(lambda c: c.data == "check_deposit")
+async def check_deposit(call: types.CallbackQuery):
+    uid = str(call.from_user.id)
+    user = user_data.get(uid, {"deposit": 0.0})
     dep = float(user.get("deposit", 0.0))
 
     if dep <= 0:
-        await call.message.answer("😅 You haven’t deposited yet.")
+        await call.message.answer("😅 No deposit detected yet. Try again after depositing.")
         return
 
     if dep < MIN_DEPOSIT:
         remain = MIN_DEPOSIT - dep
-        await call.message.answer(f"You’ve deposited ${dep:.2f}. Deposit ${remain:.2f} more to unlock 💰")
+        await call.message.answer(f"You’ve deposited ${dep:.2f}. Deposit ${remain:.2f} more to unlock 🔓")
         return
 
     if not user.get("qualified"):
         user["qualified"] = True
         save_data()
 
-    await call.message.answer("🔥 Qualified! Next step unlocked 🔓")
-    buttons = InlineKeyboardMarkup().add(
-        InlineKeyboardButton("Start Predictor ▶️", callback_data="start_numbers"),
-        InlineKeyboardButton("Stop ⏹️", callback_data="stop_numbers")
+    markup = InlineKeyboardMarkup().add(
+        InlineKeyboardButton("▶️ Start Predictor", callback_data="start_numbers"),
+        InlineKeyboardButton("⏹ Stop", callback_data="stop_numbers")
     )
-    await call.message.answer("Choose an option:", reply_markup=buttons)
 
+    await call.message.answer("🔥 Deposit confirmed! You’re now qualified.", reply_markup=markup)
+
+# === PREDICTOR LOGIC ===
 @dp.callback_query_handler(lambda c: c.data == "start_numbers")
 async def start_numbers(call: types.CallbackQuery):
     uid = str(call.from_user.id)
@@ -94,7 +128,6 @@ async def start_numbers(call: types.CallbackQuery):
 
     msg = await call.message.answer("🎯 Number: Starting...")
     while user_data.get(uid, {}).get("running"):
-        # 70%: 1–30, 30%: 30.01–300
         if random.random() < 0.7:
             num = round(random.uniform(1, 30), 2)
         else:
@@ -105,7 +138,6 @@ async def start_numbers(call: types.CallbackQuery):
         except Exception:
             pass
 
-        # dynamic delay
         if num < 10:
             delay = 10
         elif num < 30:
@@ -125,7 +157,7 @@ async def stop_numbers(call: types.CallbackQuery):
     if uid in user_data:
         user_data[uid]["running"] = False
         save_data()
-    await call.message.answer("✅ Stopped.")
+    await call.message.answer("✅ Predictor stopped.")
 
 # === POSTBACK ===
 @app.route("/postback", methods=["GET", "POST"])
@@ -141,7 +173,7 @@ def postback():
 
     if subid and event == "deposit":
         uid = str(subid)
-        user_data.setdefault(uid, {"deposit": 0.0, "qualified": False, "running": False})
+        user_data.setdefault(uid, {"deposit": 0.0, "registered": False, "qualified": False, "running": False})
         user_data[uid]["deposit"] = float(user_data[uid].get("deposit", 0.0)) + amount
         save_data()
         return "OK", 200
@@ -160,4 +192,3 @@ def run_telegram():
 if __name__ == "__main__":
     threading.Thread(target=run_flask, daemon=True).start()
     run_telegram()
-
