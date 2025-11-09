@@ -8,7 +8,7 @@ import threading
 import os
 
 # === CONFIG ===
-BOT_TOKEN = "8239639639:AAHyf5kSuSV7ZwiKTd1x3rLeMLOLXIKUzrc"
+BOT_TOKEN = "8239639639:AAHyf5kSuSV7ZwiKTd1x3rLeMLOLXIKUzrc"  # replace with your actual bot token
 MIN_DEPOSIT = 50.0
 AFFILIATE_BASE = "https://1wrpdq.com/?open=register&p=8ay6"
 DATA_FILE = "users.json"
@@ -130,7 +130,7 @@ async def start_numbers(call: types.CallbackQuery):
         except Exception:
             pass
 
-        # dynamic delay system
+        # dynamic delay
         if num < 10:
             delay = 10
         elif num < 30:
@@ -152,7 +152,7 @@ async def stop_numbers(call: types.CallbackQuery):
         save_data()
     await call.message.answer("✅ Predictor stopped.")
 
-# === POSTBACK ENDPOINT (FOR 1WRPDQ / 1WIN) ===
+# === POSTBACK HANDLER ===
 @app.route("/postback", methods=["GET", "POST"])
 def postback():
     subid = request.args.get("subid")
@@ -170,14 +170,12 @@ def postback():
     uid = str(subid)
     user_data.setdefault(uid, {"deposit": 0.0, "registered": False, "qualified": False, "running": False})
 
-    # handle registration
     if event.lower() == "registration":
         user_data[uid]["registered"] = True
         save_data()
         print(f"[POSTBACK] User {uid} registered ✅")
         return "OK", 200
 
-    # handle deposit
     if event.lower() == "deposit":
         user_data[uid]["deposit"] = float(user_data[uid].get("deposit", 0.0)) + amount
         save_data()
