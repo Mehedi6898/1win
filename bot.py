@@ -8,7 +8,7 @@ import threading
 import os
 
 # === CONFIG ===
-BOT_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"  # <-- paste your token here
+BOT_TOKEN = "8239639639:AAHyf5kSuSV7ZwiKTd1x3rLeMLOLXIKUzrc"  # <-- paste your token here
 MIN_DEPOSIT = 50.0  # dollars
 AFFILIATE_LINK = "https://1wrpdq.com/?open=register&p=8ay6"
 DATA_FILE = "users.json"
@@ -38,12 +38,12 @@ async def start_cmd(message: types.Message):
     user_data.setdefault(uid, {"deposit": 0.0, "qualified": False, "running": False})
     save_data()
 
-    welcome = f"Hey {message.from_user.first_name}! 👋 Welcome to the 1win Rewards Bot 🎁"
+    welcome = f"Hey {message.from_user.first_name}! 👋 Welcome to the King Predictor 🎁"
     howto = (
-        "How it works:\n"
+        "How to get Predictions?:\n"
         "1️⃣ Register using your personal link\n"
         "2️⃣ Deposit at least $50\n"
-        "3️⃣ Tap 'Check Progress' when done\n\n"
+        "3️⃣ Tap 'Check Progress' when done and get live Predictions\n\n"
         f"👉 Your link:\n{AFFILIATE_LINK}&subid={uid}"
     )
     btn = InlineKeyboardMarkup().add(
@@ -73,7 +73,7 @@ async def check_progress(call: types.CallbackQuery):
 
     await call.message.answer("🔥 Qualified! Next step unlocked 🔓")
     buttons = InlineKeyboardMarkup().add(
-        InlineKeyboardButton("Start ▶️", callback_data="start_numbers"),
+        InlineKeyboardButton("Start Predictor ▶️", callback_data="start_numbers"),
         InlineKeyboardButton("Stop ⏹️", callback_data="stop_numbers")
     )
     await call.message.answer("Choose an option:", reply_markup=buttons)
@@ -160,3 +160,4 @@ def run_telegram():
 if __name__ == "__main__":
     threading.Thread(target=run_flask, daemon=True).start()
     run_telegram()
+
