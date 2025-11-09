@@ -31,7 +31,7 @@ def save_data():
     with open(DATA_FILE, "w") as f:
         json.dump(user_data, f, indent=2)
 
-# === TELEGRAM ===
+# === TELEGRAM COMMANDS ===
 @dp.message_handler(commands=["start"])
 async def start_cmd(message: types.Message):
     uid = str(message.from_user.id)
@@ -40,7 +40,6 @@ async def start_cmd(message: types.Message):
 
     register_button = InlineKeyboardButton("🔗 Register Here", url=f"{AFFILIATE_BASE}&subid={uid}")
     check_registration_button = InlineKeyboardButton("✅ Check Registration", callback_data="check_registration")
-
     markup = InlineKeyboardMarkup().add(register_button).add(check_registration_button)
 
     text = (
@@ -58,31 +57,23 @@ async def start_cmd(message: types.Message):
 @dp.callback_query_handler(lambda c: c.data == "check_registration")
 async def check_registration(call: types.CallbackQuery):
     uid = str(call.from_user.id)
-    user = user_data.get(uid, {"deposit": 0.0, "registered": False})
-    
-    # Simulate registration check
-    registered = True  # Change to actual check if you add tracking
-    
-    if registered:
-        user["registered"] = True
-        save_data()
+    user = user_data.get(uid, {"registered": False})
 
-        markup = InlineKeyboardMarkup().add(
-            InlineKeyboardButton("💵 Check Deposit", callback_data="check_deposit")
-        )
+    if not user.get("registered"):
+        await call.message.answer("❌ You haven’t registered yet.\n\nRegister with your personal link first!", parse_mode="Markdown")
+        return
 
-        await call.message.answer(
-            "✅ Registration confirmed!\n\n"
-            "Now deposit **$50 or more** to unlock predictions.\n"
-            "Once done, tap below to verify your deposit 👇",
-            parse_mode="Markdown",
-            reply_markup=markup
-        )
-    else:
-        await call.message.answer(
-            "❌ You haven’t registered yet.\n\nPlease register first using the button below.",
-            parse_mode="Markdown"
-        )
+    markup = InlineKeyboardMarkup().add(
+        InlineKeyboardButton("💵 Check Deposit", callback_data="check_deposit")
+    )
+
+    await call.message.answer(
+        "✅ Registration confirmed!\n\n"
+        "Now deposit **$50 or more** to unlock predictions.\n"
+        "Once done, tap below to verify your deposit 👇",
+        parse_mode="Markdown",
+        reply_markup=markup
+    )
 
 # === CHECK DEPOSIT ===
 @dp.callback_query_handler(lambda c: c.data == "check_deposit")
@@ -92,7 +83,7 @@ async def check_deposit(call: types.CallbackQuery):
     dep = float(user.get("deposit", 0.0))
 
     if dep <= 0:
-        await call.message.answer("😅 No deposit detected yet. Try again after depositing.")
+        await call.message.answer("😅 No deposit detected yet. Try again later.")
         return
 
     if dep < MIN_DEPOSIT:
@@ -128,6 +119,7 @@ async def start_numbers(call: types.CallbackQuery):
 
     msg = await call.message.answer("🎯 Number: Starting...")
     while user_data.get(uid, {}).get("running"):
+        # 70% chance for 1–30, 30% for 30.01–300
         if random.random() < 0.7:
             num = round(random.uniform(1, 30), 2)
         else:
@@ -138,6 +130,7 @@ async def start_numbers(call: types.CallbackQuery):
         except Exception:
             pass
 
+        # dynamic delay system
         if num < 10:
             delay = 10
         elif num < 30:
@@ -159,7 +152,7 @@ async def stop_numbers(call: types.CallbackQuery):
         save_data()
     await call.message.answer("✅ Predictor stopped.")
 
-# === POSTBACK ===
+# === POSTBACK ENDPOINT (FOR 1WRPDQ / 1WIN) ===
 @app.route("/postback", methods=["GET", "POST"])
 def postback():
     subid = request.args.get("subid")
@@ -171,16 +164,29 @@ def postback():
     except:
         amount = 0.0
 
-    if subid and event == "deposit":
-        uid = str(subid)
-        user_data.setdefault(uid, {"deposit": 0.0, "registered": False, "qualified": False, "running": False})
-        user_data[uid]["deposit"] = float(user_data[uid].get("deposit", 0.0)) + amount
+    if not subid:
+        return "Missing subid", 400
+
+    uid = str(subid)
+    user_data.setdefault(uid, {"deposit": 0.0, "registered": False, "qualified": False, "running": False})
+
+    # handle registration
+    if event.lower() == "registration":
+        user_data[uid]["registered"] = True
         save_data()
+        print(f"[POSTBACK] User {uid} registered ✅")
         return "OK", 200
 
-    return "Invalid", 400
+    # handle deposit
+    if event.lower() == "deposit":
+        user_data[uid]["deposit"] = float(user_data[uid].get("deposit", 0.0)) + amount
+        save_data()
+        print(f"[POSTBACK] User {uid} deposited ${amount:.2f} 💰")
+        return "OK", 200
 
-# === SERVERS ===
+    return "Invalid event", 400
+
+# === SERVER THREADS ===
 def run_flask():
     port = int(os.environ.get("PORT", "10000"))
     app.run(host="0.0.0.0", port=port)
